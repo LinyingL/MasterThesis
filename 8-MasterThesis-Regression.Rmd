@@ -1,0 +1,133 @@
+---
+title: "MasterThesis-Regression"
+author: "Linying Li"
+date: "2024-04-29"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+df <- read.csv("/Users/lilinying/Downloads/Videos_index_forR.csv")
+```
+
+```{r}
+linear_model = lm(L_proportion ~ predicted_score + view_count + channel_subscriber_count + as.factor(year), df)
+```
+
+```{r}
+summary(linear_model)
+```
+
+```{r}
+library(car) 
+crPlots(linear_model)
+```
+
+```{r}
+library(lmtest) 
+bptest(linear_model)
+```
+```{r}
+length(df$L_proportion) 
+length(df$predicted_score) 
+```
+
+```{r}
+library(MASS)
+library(ggplot2)
+stud_res = studres(linear_model) 
+stud_res <- stud_res[!is.na(stud_res) & is.finite(stud_res)]
+ggplot() +
+  geom_density(aes(x = stud_res), color = "red") +
+  geom_line(aes(x = seq(min(stud_res), max(stud_res), length.out = 50),
+                y = dnorm(seq(min(stud_res), max(stud_res), length.out = 50)))) +
+  theme_minimal()
+```
+
+```{r}
+vif(linear_model)
+```
+```{r}
+(rstandard(linear_model) > 3 * mean(hatvalues(linear_model)))[1:20]
+```
+
+```{r}
+residuals <- resid(linear_model)
+threshold <- 3 * sd(residuals)
+outliers <- abs(residuals) > threshold
+df_clean <- df[!outliers, ]
+```
+
+```{r}
+model1 <- lm(L_proportion ~ predicted_score,, data = df_clean)
+model2 <- lm(L_proportion ~ predicted_score + view_count + channel_subscriber_count, data = df_clean)
+model3 <- lm(L_proportion ~ predicted_score + view_count + channel_subscriber_count + as.factor(year), data = df_clean)
+```
+
+```{r}
+summary(model3)
+```
+
+
+```{r}
+library(tidyverse)
+ggplot(df_clean, aes(x = predicted_score, y = L_proportion)) +
+  geom_point(color = "grey90") +
+  geom_smooth(method = "lm") +
+  theme_minimal() +
+  ylab("L proportion") +
+  ggtitle("Figure: Relationship Between Predicted Score and L Proportion")
+```
+
+```{r}
+library(car)
+bptest(model3)
+vif(model3)
+```
+
+```{r}
+library(MASS)
+stud_res = studres(model3) 
+stud_res <- stud_res[!is.na(stud_res) & is.finite(stud_res)]
+ggplot() +
+  geom_density(aes(x = stud_res), color = "red") +
+  geom_line(aes(x = seq(min(stud_res), max(stud_res), length.out = 50),
+                y = dnorm(seq(min(stud_res), max(stud_res), length.out = 50)))) +
+  theme_minimal()
+```
+
+```{r}
+bptest(model3)
+df_clean <- na.omit(df_clean)
+df_clean$residuals <- residuals(model3)
+
+library(ggplot2)
+ggplot(df_clean, aes(x =channel_subscriber_count, y = residuals)) +
+  geom_point(alpha = 0.5) +  
+  geom_hline(yintercept = 0, color = "red") + 
+  labs(x = "View Count", y = "Residuals", title = "Residuals vs View Count") +
+  theme_minimal()  
+```
+```{r}
+library(sandwich)
+library(lmtest)
+```
+
+```{r}
+library(lmtest)
+model4 <- coeftest(model3, vcov = vcovHC(model3, type = "HC1"))
+```
+
+```{r}
+library(stargazer)
+stargazer(model1, model2, model3, model4, title="Table 7: Regression Results", type="text", 
+          header=FALSE,
+          digits=5, 
+          digit.separator=".", 
+          decimal.mark=",",  
+          align=TRUE,
+          column.labels=c("Model 1", "Model 2", "Model 3", "Model 4"),
+          covariate.labels=c("Predicted Score", "View Count", "Subscriber Count"),
+          dep.var.labels.include = FALSE,
+          dep.var.caption="Dependent variable: the proportion of L label comments",
+          model.names=FALSE)
+```
